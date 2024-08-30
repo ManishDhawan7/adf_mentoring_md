@@ -1,0 +1,63 @@
+{
+	"name": "EtlControlTable",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabaseLinkedServiceModule4",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "container",
+				"type": "varchar"
+			},
+			{
+				"name": "folder",
+				"type": "varchar"
+			},
+			{
+				"name": "file name",
+				"type": "varchar"
+			},
+			{
+				"name": "column delimiter",
+				"type": "varchar"
+			},
+			{
+				"name": "encoding",
+				"type": "varchar"
+			},
+			{
+				"name": "escape character",
+				"type": "varchar"
+			},
+			{
+				"name": "quote character",
+				"type": "varchar"
+			},
+			{
+				"name": "schema name",
+				"type": "varchar"
+			},
+			{
+				"name": "table name",
+				"type": "varchar"
+			},
+			{
+				"name": "DIU Value",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Mapping",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "etl",
+			"table": "tControlMetadata"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

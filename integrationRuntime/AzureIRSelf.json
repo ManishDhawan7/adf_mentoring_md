@@ -1,0 +1,6 @@
+{
+	"name": "AzureIRSelf",
+	"properties": {
+		"type": "SelfHosted"
+	}
+}

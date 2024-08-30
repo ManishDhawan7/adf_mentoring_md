@@ -1,0 +1,399 @@
+{
+	"name": "Module9PipelineControlTable",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Control Table",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Truncate Table Script",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT * FROM etl.tControlMetadata",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "EtlControlTable",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Truncate Table Script",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabaseLinkedServiceModule4",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "Truncate table stg.credits\nTruncate table stg.movies_metadata\nTruncate table stg.ratings"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Loopformultiplefiles",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Control Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Control Table').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "CopydatafromCsvtoSQL",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"additionalColumns": [
+										{
+											"name": "pipelineId",
+											"value": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "source_filename",
+											"value": "$$FILENAME"
+										}
+									],
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": false,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert",
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"value": "@json(string(item().Mapping))",
+									"type": "Expression"
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Module9SourceFiles",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().Container",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().Folder",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().file_name",
+											"type": "Expression"
+										},
+										"column_delimiter": {
+											"value": "@item().column_delimiter",
+											"type": "Expression"
+										},
+										"escape_character": {
+											"value": "@item().escape_character",
+											"type": "Expression"
+										},
+										"quote_character": {
+											"value": "@item().quote_character",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Module9DestinationTable",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": {
+											"value": "@item().schema_name",
+											"type": "Expression"
+										},
+										"TableName": {
+											"value": "@item().table_name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Loggins_Stored_procedure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CopydatafromCsvtoSQL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[logging]",
+								"storedProcedureParameters": {
+									"activity_name": {
+										"value": {
+											"value": "@item().file_name",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"billingduration": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.billingReference.totalBillableDuration[0]['duration']",
+											"type": "Expression"
+										},
+										"type": "Double"
+									},
+									"copy_duration": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.copyDuration",
+											"type": "Expression"
+										},
+										"type": "Double"
+									},
+									"endtime": {
+										"value": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"metertype": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.billingReference.totalBillableDuration[0]['meterType']",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"number_of_parallel_copies": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.usedParallelCopies",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"number_of_processed_Files": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.filesRead",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"number_of_total_rows": {
+										"value": {
+											"value": "@add(activity('CopydatafromCsvtoSQL').output.rowsRead,activity('CopydatafromCsvtoSQL').output.rowsCopied)",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"number_of_used_DIU": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.usedDataIntegrationUnits",
+											"type": "Expression"
+										},
+										"type": "Int16"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_Run_id": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"queue": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.executionDetails[0].profile.queue.status",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"start_time": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.executionDetails[0].start",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"status": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.executionDetails[0].status",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"transfer_duration": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').output.executionDetails[0].duration",
+											"type": "Expression"
+										},
+										"type": "Double"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabaseLinkedServiceModule4",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Errorlog",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CopydatafromCsvtoSQL",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[etl].[ErrorLogs]",
+								"storedProcedureParameters": {
+									"activity_name": {
+										"value": {
+											"value": "@item().file_name",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"date_time": {
+										"value": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"error_code": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').Error.errorCode",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"error_message": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').Error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"failure_type": {
+										"value": {
+											"value": "@activity('CopydatafromCsvtoSQL').Error.failureType",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_run_id": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabaseLinkedServiceModule4",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2024-08-28T12:16:16Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

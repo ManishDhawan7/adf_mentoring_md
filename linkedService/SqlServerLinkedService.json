@@ -1,0 +1,22 @@
+{
+	"name": "SqlServerLinkedService",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"connectionString": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVaultModule2",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "sec-SQLDB"
+			}
+		},
+		"connectVia": {
+			"referenceName": "AzureIRSelf",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
